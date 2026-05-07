@@ -13,6 +13,7 @@ param contentUnderstandingEndpoint string
 @secure()
 param contentUnderstandingKey string
 param contentUnderstandingProject string
+@description('Content Understanding currently requires a preview API version.')
 param contentUnderstandingApiVersion string = '2024-12-01-preview'
 
 var tags = {
@@ -168,7 +169,7 @@ resource ui 'Microsoft.App/containerApps@2024-03-01' = {
           env: [
             {
               name: 'API_BASE_URL'
-              value: 'https://${api.properties.configuration.ingress.fqdn}'
+              value: 'http://${api.properties.configuration.ingress.fqdn}'
             }
           ]
         }
@@ -182,4 +183,4 @@ resource ui 'Microsoft.App/containerApps@2024-03-01' = {
 }
 
 output SERVICE_UI_ENDPOINT string = 'https://${ui.properties.configuration.ingress.fqdn}'
-output SERVICE_API_INTERNAL_ENDPOINT string = 'https://${api.properties.configuration.ingress.fqdn}'
+output SERVICE_API_INTERNAL_ENDPOINT string = 'http://${api.properties.configuration.ingress.fqdn}'

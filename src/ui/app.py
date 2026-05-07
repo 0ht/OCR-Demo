@@ -13,9 +13,9 @@ uploaded_file = st.file_uploader("ファイルをアップロード", type=["pdf
 if uploaded_file is not None:
     if st.button("OCR実行"):
         with st.spinner("解析中..."):
-            files = {
-                "file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type or "application/octet-stream")
-            }
+            uploaded_content_type = uploaded_file.type or "application/octet-stream"
+            file_payload = (uploaded_file.name, uploaded_file.getvalue(), uploaded_content_type)
+            files = {"file": file_payload}
             response = requests.post(f"{api_base_url.rstrip('/')}/ocr", files=files, timeout=120)
 
         if response.status_code != 200:

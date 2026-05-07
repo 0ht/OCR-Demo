@@ -17,6 +17,10 @@ def _analyze_with_document_intelligence(file_bytes: bytes) -> dict[str, Any]:
     key = _required_env("DOCUMENT_INTELLIGENCE_KEY")
     model_id = os.getenv("DOCUMENT_INTELLIGENCE_MODEL_ID", "prebuilt-read")
     api_version = os.getenv("DOCUMENT_INTELLIGENCE_API_VERSION", "2024-11-30")
+    max_polling_attempts = int(os.getenv("DOCUMENT_INTELLIGENCE_MAX_POLLING_ATTEMPTS", "60"))
+    polling_interval_seconds = float(
+        os.getenv("DOCUMENT_INTELLIGENCE_POLLING_INTERVAL_SECONDS", "2")
+    )
 
     analyze_url = (
         f"{endpoint}/documentintelligence/documentModels/{model_id}:analyze"
@@ -38,7 +42,7 @@ def _analyze_with_document_intelligence(file_bytes: bytes) -> dict[str, Any]:
         if not operation_location:
             raise RuntimeError("Document Intelligence operation-location header is missing")
 
-        for _ in range(30):
+        for _ in range(max_polling_attempts):
             poll_response = client.get(
                 operation_location,
                 headers={"Ocp-Apim-Subscription-Key": key},
@@ -50,7 +54,7 @@ def _analyze_with_document_intelligence(file_bytes: bytes) -> dict[str, Any]:
                 return payload.get("analyzeResult", {})
             if status in {"failed", "canceled"}:
                 raise RuntimeError(f"Document Intelligence failed: {payload}")
-            time.sleep(2)
+            time.sleep(polling_interval_seconds)
 
     raise RuntimeError("Document Intelligence polling timed out")
 
@@ -81,12 +85,10 @@ def _analyze_with_content_understanding(text: str) -> dict[str, Any] | None:
             },
         )
 
-    if response.is_error:
-        return {
-            "status": "error",
-            "code": response.status_code,
-            "message": response.text,
-        }
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise RuntimeError(f"Content Understanding failed: {exc.response.text}") from exc
 
     return response.json()
 

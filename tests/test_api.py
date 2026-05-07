@@ -28,6 +28,7 @@ def test_ocr_endpoint(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["documentIntelligence"]["content"] == "text"
+    assert response.json()["contentUnderstanding"]["summary"] == "ok"
 
 
 def test_ocr_empty_file():
@@ -38,3 +39,4 @@ def test_ocr_empty_file():
     )
 
     assert response.status_code == 400
+    assert response.json() == {"detail": "Uploaded file is empty"}
