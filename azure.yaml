@@ -1,0 +1,19 @@
+name: ocr-demo
+metadata:
+  template: ocr-demo@0.0.1
+infra:
+  provider: bicep
+  path: infra
+services:
+  api:
+    project: ./src/backend
+    language: py
+    host: containerapp
+    docker:
+      path: Dockerfile
+  ui:
+    project: ./src/ui
+    language: py
+    host: containerapp
+    docker:
+      path: Dockerfile
