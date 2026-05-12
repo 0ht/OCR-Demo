@@ -1,0 +1,37 @@
+__pycache__/
+*.py[cod]
+infra/main.json
+
+# azd 環境 (サブスクリプション ID・リソース名等を含む)
+.azure/
+
+# Python
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# 環境変数・シークレット
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# テストキャッシュ
+.pytest_cache/
+
+# ログ
+*.log
+
+# draw.io 一時ファイル
+.*\.dtmp
