@@ -2,35 +2,38 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-    "environmentName": {
+    "projectName": {
       "value": "${AZURE_ENV_NAME}"
+    },
+    "environment": {
+      "value": "${ENVIRONMENT=dev}"
     },
     "location": {
       "value": "${AZURE_LOCATION}"
     },
+    "resourceGroupName": {
+      "value": "${AZURE_RESOURCE_GROUP=}"
+    },
     "apiImage": {
-      "value": "${SERVICE_API_IMAGE_NAME}"
+      "value": "${SERVICE_API_IMAGE_NAME=mcr.microsoft.com/k8se/quickstart:latest}"
     },
     "uiImage": {
-      "value": "${SERVICE_UI_IMAGE_NAME}"
+      "value": "${SERVICE_UI_IMAGE_NAME=mcr.microsoft.com/k8se/quickstart:latest}"
     },
-    "documentIntelligenceEndpoint": {
-      "value": "${DOCUMENT_INTELLIGENCE_ENDPOINT}"
+    "foundryProjectName": {
+      "value": "${FOUNDRY_PROJECT_NAME=default-project}"
     },
-    "documentIntelligenceKey": {
-      "value": "${DOCUMENT_INTELLIGENCE_KEY}"
-    },
-    "contentUnderstandingEndpoint": {
-      "value": "${CONTENT_UNDERSTANDING_ENDPOINT}"
-    },
-    "contentUnderstandingKey": {
-      "value": "${CONTENT_UNDERSTANDING_KEY}"
-    },
-    "contentUnderstandingProject": {
-      "value": "${CONTENT_UNDERSTANDING_PROJECT}"
+    "analyzerId": {
+      "value": "${CONTENT_UNDERSTANDING_ANALYZER_ID=prebuilt-read}"
     },
     "contentUnderstandingApiVersion": {
-      "value": "${CONTENT_UNDERSTANDING_API_VERSION}"
+      "value": "${CONTENT_UNDERSTANDING_API_VERSION=2025-11-01}"
+    },
+    "documentIntelligenceModelId": {
+      "value": "${DOCUMENT_INTELLIGENCE_MODEL_ID=prebuilt-read}"
+    },
+    "documentIntelligenceApiVersion": {
+      "value": "${DOCUMENT_INTELLIGENCE_API_VERSION=2024-11-30}"
     }
   }
 }

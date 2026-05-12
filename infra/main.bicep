@@ -1,186 +1,174 @@
-param location string = resourceGroup().location
-param environmentName string
+@description('プロジェクト名 (リソース命名に使用)')
+param projectName string
 
-param apiImage string
-param uiImage string
+@description('環境名 (dev / stg / prod)')
+@allowed([
+  'dev'
+  'stg'
+  'prod'
+])
+param environment string
 
-param documentIntelligenceEndpoint string
-@secure()
-param documentIntelligenceKey string
+@description('Azure リージョン')
+param location string = deployment().location
+
+@description('既存または新規作成するリソースグループ名。未指定時は rg-{projectName}-{environment}')
+param resourceGroupName string = ''
+
+@description('Foundry プロジェクト名 (新版 Foundry の子リソース)')
+param foundryProjectName string = 'default-project'
+
+@description('Content Understanding で使用する prebuilt または custom analyzer ID')
+param analyzerId string = 'prebuilt-read'
+
+@description('Content Understanding REST API バージョン')
+param contentUnderstandingApiVersion string = '2025-11-01'
+
+@description('Document Intelligence で使用する prebuilt モデル ID')
 param documentIntelligenceModelId string = 'prebuilt-read'
 
-param contentUnderstandingEndpoint string
-@secure()
-param contentUnderstandingKey string
-param contentUnderstandingProject string
-@description('Content Understanding currently requires a preview API version.')
-param contentUnderstandingApiVersion string = '2024-12-01-preview'
+@description('Document Intelligence REST API バージョン')
+param documentIntelligenceApiVersion string = '2024-11-30'
+
+@description('API コンテナイメージ (azd が解決)')
+param apiImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+@description('UI コンテナイメージ (azd が解決)')
+param uiImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+targetScope = 'subscription'
+
+var rgName = empty(resourceGroupName) ? 'rg-${projectName}-${environment}' : resourceGroupName
 
 var tags = {
-  'azd-env-name': environmentName
+  'azd-env-name': projectName
+  project: projectName
+  managed_by: 'azd'
+  environment: environment
 }
 
-resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
-  name: 'log-${environmentName}'
+resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+  name: rgName
   location: location
   tags: tags
-  properties: {
-    sku: {
-      name: 'PerGB2018'
-    }
-    retentionInDays: 30
+}
+
+module monitoring 'modules/monitoring.bicep' = {
+  scope: rg
+  name: 'monitoring'
+  params: {
+    projectName: projectName
+    environment: environment
+    location: location
+    tags: tags
   }
 }
 
-resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
-  name: 'vnet-${environmentName}'
-  location: location
-  tags: tags
-  properties: {
-    addressSpace: {
-      addressPrefixes: [
-        '10.10.0.0/16'
-      ]
-    }
-    subnets: [
-      {
-        name: 'aca-infra'
-        properties: {
-          addressPrefix: '10.10.0.0/23'
-          delegations: [
-            {
-              name: 'aca-delegation'
-              properties: {
-                serviceName: 'Microsoft.App/environments'
-              }
-            }
-          ]
-        }
-      }
-    ]
+module network 'modules/network.bicep' = {
+  scope: rg
+  name: 'network'
+  params: {
+    projectName: projectName
+    environment: environment
+    location: location
+    tags: tags
   }
 }
 
-resource managedEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
-  name: 'acae-${environmentName}'
-  location: location
-  tags: tags
-  properties: {
-    appLogsConfiguration: {
-      destination: 'log-analytics'
-      logAnalyticsConfiguration: {
-        customerId: logAnalytics.properties.customerId
-        sharedKey: listKeys(logAnalytics.id, logAnalytics.apiVersion).primarySharedKey
-      }
-    }
-    vnetConfiguration: {
-      infrastructureSubnetId: '${vnet.id}/subnets/aca-infra'
-      internal: true
-    }
+module dns 'modules/privateDns.bicep' = {
+  scope: rg
+  name: 'privateDns'
+  params: {
+    projectName: projectName
+    environment: environment
+    location: location
+    tags: tags
+    vnetId: network.outputs.vnetId
   }
 }
 
-resource api 'Microsoft.App/containerApps@2024-03-01' = {
-  name: 'api-${environmentName}'
-  location: location
-  tags: tags
-  properties: {
-    managedEnvironmentId: managedEnvironment.id
-    configuration: {
-      ingress: {
-        external: false
-        targetPort: 8000
-        transport: 'http'
-      }
-      secrets: [
-        {
-          name: 'document-intelligence-key'
-          value: documentIntelligenceKey
-        }
-        {
-          name: 'content-understanding-key'
-          value: contentUnderstandingKey
-        }
-      ]
-    }
-    template: {
-      containers: [
-        {
-          name: 'api'
-          image: apiImage
-          env: [
-            {
-              name: 'DOCUMENT_INTELLIGENCE_ENDPOINT'
-              value: documentIntelligenceEndpoint
-            }
-            {
-              name: 'DOCUMENT_INTELLIGENCE_MODEL_ID'
-              value: documentIntelligenceModelId
-            }
-            {
-              name: 'DOCUMENT_INTELLIGENCE_KEY'
-              secretRef: 'document-intelligence-key'
-            }
-            {
-              name: 'CONTENT_UNDERSTANDING_ENDPOINT'
-              value: contentUnderstandingEndpoint
-            }
-            {
-              name: 'CONTENT_UNDERSTANDING_PROJECT'
-              value: contentUnderstandingProject
-            }
-            {
-              name: 'CONTENT_UNDERSTANDING_API_VERSION'
-              value: contentUnderstandingApiVersion
-            }
-            {
-              name: 'CONTENT_UNDERSTANDING_KEY'
-              secretRef: 'content-understanding-key'
-            }
-          ]
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 1
-      }
-    }
+module acr 'modules/acr.bicep' = {
+  scope: rg
+  name: 'acr'
+  params: {
+    projectName: projectName
+    environment: environment
+    location: location
+    tags: tags
+    subnetPrivateEndpointsId: network.outputs.peSubnetId
+    privateDnsZoneAcrId: dns.outputs.acrZoneId
   }
 }
 
-resource ui 'Microsoft.App/containerApps@2024-03-01' = {
-  name: 'ui-${environmentName}'
-  location: location
-  tags: tags
-  properties: {
-    managedEnvironmentId: managedEnvironment.id
-    configuration: {
-      ingress: {
-        external: true
-        targetPort: 8501
-        transport: 'http'
-      }
-    }
-    template: {
-      containers: [
-        {
-          name: 'ui'
-          image: uiImage
-          env: [
-            {
-              name: 'API_BASE_URL'
-              value: 'http://${api.properties.configuration.ingress.fqdn}'
-            }
-          ]
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 1
-      }
-    }
+module foundry 'modules/foundry.bicep' = {
+  scope: rg
+  name: 'foundry'
+  params: {
+    projectName: projectName
+    environment: environment
+    location: location
+    tags: tags
+    foundryProjectName: foundryProjectName
+    subnetPrivateEndpointsId: network.outputs.peSubnetId
+    privateDnsZoneCognitiveServicesId: dns.outputs.cognitiveServicesZoneId
+    privateDnsZoneOpenAIId: dns.outputs.openAIZoneId
+    privateDnsZoneServicesAIId: dns.outputs.servicesAIZoneId
   }
 }
 
-output SERVICE_UI_ENDPOINT string = 'https://${ui.properties.configuration.ingress.fqdn}'
-output SERVICE_API_INTERNAL_ENDPOINT string = 'http://${api.properties.configuration.ingress.fqdn}'
+module containerEnv 'modules/containerEnv.bicep' = {
+  scope: rg
+  name: 'containerEnv'
+  params: {
+    projectName: projectName
+    environment: environment
+    location: location
+    tags: tags
+    infrastructureSubnetId: network.outputs.acaSubnetId
+    logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsId
+  }
+}
+
+module containerApps 'modules/containerApps.bicep' = {
+  scope: rg
+  name: 'containerApps'
+  params: {
+    projectName: projectName
+    environment: environment
+    location: location
+    tags: tags
+    managedEnvironmentId: containerEnv.outputs.managedEnvironmentId
+    apiImage: apiImage
+    uiImage: uiImage
+    foundryEndpoint: foundry.outputs.endpoint
+    foundryProjectName: foundry.outputs.projectName
+    analyzerId: analyzerId
+    contentUnderstandingApiVersion: contentUnderstandingApiVersion
+    documentIntelligenceModelId: documentIntelligenceModelId
+    documentIntelligenceApiVersion: documentIntelligenceApiVersion
+  }
+}
+
+module rbac 'modules/rbac.bicep' = {
+  scope: rg
+  name: 'rbac'
+  params: {
+    acrName: acr.outputs.name
+    foundryAccountName: foundry.outputs.accountName
+    foundryProjectName: foundry.outputs.projectName
+    apiPrincipalId: containerApps.outputs.apiPrincipalId
+    uiPrincipalId: containerApps.outputs.uiPrincipalId
+  }
+}
+
+output AZURE_RESOURCE_GROUP string = rg.name
+output AZURE_LOCATION string = location
+output AZURE_CONTAINER_REGISTRY_NAME string = acr.outputs.name
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = acr.outputs.loginServer
+output FOUNDRY_ENDPOINT string = foundry.outputs.endpoint
+output FOUNDRY_ACCOUNT_NAME string = foundry.outputs.accountName
+output FOUNDRY_PROJECT_NAME string = foundry.outputs.projectName
+output SERVICE_API_NAME string = containerApps.outputs.apiName
+output SERVICE_UI_NAME string = containerApps.outputs.uiName
+output SERVICE_UI_ENDPOINT string = containerApps.outputs.uiEndpoint
+output SERVICE_API_INTERNAL_ENDPOINT string = containerApps.outputs.apiEndpoint
