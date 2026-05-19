@@ -15,6 +15,7 @@ param managedEnvironmentId string
 
 param apiImage string
 param uiImage string
+
 param foundryEndpoint string
 param foundryProjectName string
 param analyzerId string

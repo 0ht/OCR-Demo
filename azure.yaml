@@ -20,34 +20,6 @@ services:
       path: Dockerfile
       remoteBuild: true
 hooks:
-  # provision 後に System Assigned MI で ACR レジストリを設定
-  postprovision:
-    posix:
-      shell: sh
-      run: |
-        echo ">>> Configuring ACR registry with System Assigned MI..."
-        az containerapp registry set \
-          -n "$SERVICE_API_NAME" -g "$AZURE_RESOURCE_GROUP" \
-          --server "$AZURE_CONTAINER_REGISTRY_ENDPOINT" \
-          --identity system --output none
-        az containerapp registry set \
-          -n "$SERVICE_UI_NAME" -g "$AZURE_RESOURCE_GROUP" \
-          --server "$AZURE_CONTAINER_REGISTRY_ENDPOINT" \
-          --identity system --output none
-        echo ">>> Registry configured."
-    windows:
-      shell: pwsh
-      run: |
-        Write-Host ">>> Configuring ACR registry with System Assigned MI..."
-        az containerapp registry set `
-          -n $env:SERVICE_API_NAME -g $env:AZURE_RESOURCE_GROUP `
-          --server $env:AZURE_CONTAINER_REGISTRY_ENDPOINT `
-          --identity system --output none
-        az containerapp registry set `
-          -n $env:SERVICE_UI_NAME -g $env:AZURE_RESOURCE_GROUP `
-          --server $env:AZURE_CONTAINER_REGISTRY_ENDPOINT `
-          --identity system --output none
-        Write-Host ">>> Registry configured."
   # 閉域リソースへのデプロイのため一時的に Public Access を開放
   predeploy:
     posix:
@@ -55,6 +27,9 @@ hooks:
       run: |
         echo ">>> Temporarily enabling public access for deployment..."
         az acr update -n "$AZURE_CONTAINER_REGISTRY_NAME" --public-network-enabled true --default-action Allow --output none
+        echo ">>> Configuring ACR registry with System Assigned MI..."
+        az containerapp registry set -n "$SERVICE_API_NAME" -g "$AZURE_RESOURCE_GROUP" --server "$AZURE_CONTAINER_REGISTRY_ENDPOINT" --identity system --output none
+        az containerapp registry set -n "$SERVICE_UI_NAME" -g "$AZURE_RESOURCE_GROUP" --server "$AZURE_CONTAINER_REGISTRY_ENDPOINT" --identity system --output none
         echo ">>> Waiting for network changes to propagate (30s)..."
         sleep 30
     windows:
@@ -62,6 +37,9 @@ hooks:
       run: |
         Write-Host ">>> Temporarily enabling public access for deployment..."
         az acr update -n $env:AZURE_CONTAINER_REGISTRY_NAME --public-network-enabled true --default-action Allow --output none
+        Write-Host ">>> Configuring ACR registry with System Assigned MI..."
+        az containerapp registry set -n $env:SERVICE_API_NAME -g $env:AZURE_RESOURCE_GROUP --server $env:AZURE_CONTAINER_REGISTRY_ENDPOINT --identity system --output none
+        az containerapp registry set -n $env:SERVICE_UI_NAME -g $env:AZURE_RESOURCE_GROUP --server $env:AZURE_CONTAINER_REGISTRY_ENDPOINT --identity system --output none
         Write-Host ">>> Waiting for network changes to propagate (30s)..."
         Start-Sleep -Seconds 30
   # デプロイ完了後に Public Access を閉鎖

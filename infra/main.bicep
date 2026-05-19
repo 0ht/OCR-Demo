@@ -1,3 +1,5 @@
+targetScope = 'subscription'
+
 @description('プロジェクト名 (リソース命名に使用)')
 param projectName string
 
@@ -10,7 +12,7 @@ param projectName string
 param environment string
 
 @description('Azure リージョン')
-param location string = deployment().location
+param location string
 
 @description('既存または新規作成するリソースグループ名。未指定時は rg-{projectName}-{environment}')
 param resourceGroupName string = ''
@@ -35,8 +37,6 @@ param apiImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('UI コンテナイメージ (azd が解決)')
 param uiImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
-
-targetScope = 'subscription'
 
 var rgName = empty(resourceGroupName) ? 'rg-${projectName}-${environment}' : resourceGroupName
 
@@ -153,9 +153,9 @@ module rbac 'modules/rbac.bicep' = {
   scope: rg
   name: 'rbac'
   params: {
-    acrName: acr.outputs.name
     foundryAccountName: foundry.outputs.accountName
     foundryProjectName: foundry.outputs.projectName
+    acrName: acr.outputs.name
     apiPrincipalId: containerApps.outputs.apiPrincipalId
     uiPrincipalId: containerApps.outputs.uiPrincipalId
   }
